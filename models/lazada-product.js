@@ -14,45 +14,100 @@ function getProductLazada(url) {
         }
         else {
             const $ = cheerio.load(body);
-            deferProduct.resolve(_crawlProductData($));
+
+            const pageError = _checkPageError($);
+            console.log(pageError);
+
+            if (pageError.status === 400) {
+                deferProduct.reject(pageError.error);
+            }
+            else {
+                deferProduct.resolve(_crawlProductData($));
+            }
+
         }
     });
 
     return deferProduct.promise;
 }
 
+function _checkPageError($) {
+    const productNotFound = $('.comm-error .error-info').text();
+    if (productNotFound) {
+        return {status: 400, error: productNotFound};
+    }
+    const productTitle = $('.pdp-product-title').text();
+    if (productTitle === "") {
+        return {status: 400, error: "Trang không tìm thấy"};
+    }
+    return {status: 200};
+}
 
 function _crawlProductData($) {
-    const generalData = _crawlGeneralData($);
+    const generalInfo = _crawlGeneralData($);
+    const productHighlights = _crawlProductHighlights($);
+    const generalFeatures = _crawlGeneralFeatures($);
     const ratingData = _crawlRatingData($);
     const reviewData = _crawlTopReviews($);
-    // const specificateData = _crawlSpecificateData($);
+    const boxContent = _crawlBoxContent($);
 
-    return {generalData, ratingData, reviewData};
+    console.log(generalInfo);
+    console.log(productHighlights);
+    console.log(generalFeatures);
+    console.log(ratingData);
+    console.log(reviewData);
+    console.log(boxContent);
+
+    return {generalInfo, productHighlights, generalFeatures, ratingData, reviewData, boxContent};
 }
 
 function _crawlGeneralData($) {
     const title = $('.pdp-product-title').text();
-    console.log(title);
     const imageSrc = $('.pdp-mod-common-image.gallery-preview-panel__image').attr('src');
-    console.log(imageSrc);
     const priceCurrent = $('.pdp-price.pdp-price_type_normal.pdp-price_color_orange.pdp-price_size_xl').text();
-    console.log(priceCurrent);
     const priceLast = $('.pdp-price.pdp-price_type_deleted.pdp-price_color_lightgray.pdp-price_size_xs').text();
-    console.log(priceLast);
     const priceDiscount = $('.pdp-product-price__discount').text();
-    console.log(priceDiscount);
     const brand = $('.pdp-link.pdp-link_size_s.pdp-link_theme_blue.pdp-product-brand__brand-link').text();
-    console.log(brand);
     return {title, imageSrc, priceCurrent, priceLast, priceDiscount, brand};
 }
 
+
+function _crawlProductHighlights($) {
+    const product_highlights = $('.html-content.pdp-product-highlights li');
+    if (!_.isEmpty(product_highlights)) {
+        return product_highlights.map((index, highlight) => {
+            return [$(highlight).text()];
+        }).get();
+    }
+}
+
+function _crawlGeneralFeatures($) {
+    const general_features = $('.pdp-general-features .specification-keys li');
+    if (!_.isEmpty(general_features)) {
+        return general_features.map((index, feature) => {
+            const key = $(feature).find('.key-title').text().trim();
+            const value = $(feature).find('.html-content.key-value').text();
+            return {[key]: value};
+        }).get();
+    }
+    return [];
+}
+
+
+function _crawlBoxContent($) {
+    const box_content_title = $('.box-content .key-title');
+    const box_content = $('.box-content .html-content.box-content-html');
+    if (!_.isEmpty(box_content_title) && !_.isEmpty(box_content)) {
+        return {[box_content_title.text()]: box_content.text()};
+    }
+    return {};
+}
+
+
 function _crawlRatingData($) {
     const score_average = $('.pdp-mod-review .score-average').text();
-    const score_max = $('.pdp-mod-review .score-max').text();
+    const score_max = $('.pdp-mod-review .score-max').text().slice(1);
     const rate_count = $('.pdp-mod-review .count').text();
-    console.log(score_average + score_max);
-    console.log(rate_count);
 
     return {score_average, score_max, rate_count};
 }
@@ -61,14 +116,12 @@ function _crawlTopReviews($) {
 
     const mod_reviews = $('.mod-reviews .item');
     if (!_.isEmpty(mod_reviews)) {
-        console.log(mod_reviews.length);
         return mod_reviews.map((index, review) => {
             const author = $(review).find('.middle').find('span').first().text();
-            const verifyBought = $(review).find('.middle .verify').text();
+            const purchase = $(review).find('.middle .verify').text();
             const content = $(review).find('.item-content .content').text();
             const date = $(review).find('.top span').text();
-            console.log({author, verifyBought, content, date});
-            return {author, content, date};
+            return {author, purchase, content, date};
         }).get();
     }
     return [];

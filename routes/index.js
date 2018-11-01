@@ -12,7 +12,7 @@ router.post('/product', function (req, res) {
     lazada_product.getProductLazada(productURL).then((product) => {
         res.json(product);
     }).catch((err) => {
-        res.status(200).end(err);
+        res.status(400).end(err);
     });
 
 });
